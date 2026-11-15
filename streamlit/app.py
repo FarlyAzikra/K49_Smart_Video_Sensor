@@ -30,11 +30,12 @@ st.markdown("""
     .main-header h1 { margin: 0; font-size: 28px; color: white; }
     .main-header p { margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; }
     .metric-card {
-        background-color: #F8FAFC;
-        border-left: 5px solid #1976D2;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        background-color: #161E2E;
+        border: 1px solid #26334D;
+        border-left: 5px solid #2196F3;
+        padding: 18px 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -99,9 +100,9 @@ if menu == "🏠 Home":
         with cols_team[idx]:
             st.markdown(f"""
             <div class="metric-card">
-                <h4 style="margin:0 0 5px 0; color:#0D47A1;">{anggota['nama']}</h4>
-                <p style="margin:0; font-size:14px;"><b>NIM:</b> {anggota['nim']}</p>
-                <p style="margin:4px 0 0 0; font-size:13px; color:#475569;"><i>Peran: {anggota['peran']}</i></p>
+                <h4 style="margin:0 0 8px 0; color:#60A5FA; font-size:18px;">{anggota['nama']}</h4>
+                <p style="margin:0; font-size:14px; color:#F8FAFC;"><b>NIM:</b> <code style="background:#0F172A; color:#38BDF8; padding:2px 6px; border-radius:4px;">{anggota['nim']}</code></p>
+                <p style="margin:8px 0 0 0; font-size:13px; color:#94A3B8;"><i>Peran: {anggota['peran']}</i></p>
             </div>
             """, unsafe_allow_html=True)
     st.markdown("---")
