@@ -1,6 +1,7 @@
 import os
 import gc
 import cv2
+cv2.setNumThreads(1)
 import time
 import tempfile
 import pandas as pd
@@ -157,7 +158,7 @@ elif menu == "🎥 Video Tracking":
         with col_set3:
             speed_mode = st.selectbox(
                 "Mode Pemrosesan Server",
-                ["Cepat (Rekomendasi Cloud)", "Detail (Lokal / Laptop)"],
+                ["Hemat RAM (Cloud Gratis)", "Full Frame (Laptop / Localhost)"],
                 index=0
             )
 
@@ -192,27 +193,32 @@ elif menu == "🎥 Video Tracking":
             if st.button("▶️ Mulai Proses Tracking", type="primary"):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-                status_text.info("⏳ Memuat model YOLO11s...")
 
-                model_path = "model/detection_model.pt" if os.path.exists("model/detection_model.pt") else "yolo11s.pt"
-                model = load_yolo_model(model_path)
-                vehicle_classes = {1: "motorcycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
-
-                # Pengaturan ringan untuk CPU Cloud vs Detail untuk Laptop
-                if speed_mode == "Cepat (Rekomendasi Cloud)":
-                    infer_size = 480
-                    frame_skip = 3
-                    target_w = 640
+                # Gunakan yolo11n.pt pada mode Hemat RAM agar tidak melebihi batas 1GB Streamlit Cloud
+                if speed_mode == "Hemat RAM (Cloud Gratis)":
+                    status_text.info("⏳ Memuat model ringan YOLO11n (optimasi server cloud)...")
+                    model = load_yolo_model("yolo11n.pt")
+                    infer_size = 320
+                    frame_skip = 4
+                    target_w = 480
+                    max_frames_limit = 240  # Maksimal ~8-10 detik video agar bebas OOM
                 else:
+                    status_text.info("⏳ Memuat model YOLO11s (mode lokal)...")
+                    model_path = "model/detection_model.pt" if os.path.exists("model/detection_model.pt") else "yolo11s.pt"
+                    model = load_yolo_model(model_path)
                     infer_size = 640
                     frame_skip = 1
                     target_w = 854
+                    max_frames_limit = 99999
+
+                vehicle_classes = {1: "motorcycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 
                 cap = cv2.VideoCapture(tfile.name)
                 orig_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 orig_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                 fps_in = cap.get(cv2.CAP_PROP_FPS) or 25.0
-                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+                raw_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+                total_frames = min(raw_total, max_frames_limit)
 
                 scale = target_w / orig_w if orig_w > target_w else 1.0
                 width = int(orig_w * scale)
@@ -230,7 +236,7 @@ elif menu == "🎥 Video Tracking":
                 processed_frames = 0
                 t0 = time.time()
 
-                while cap.isOpened():
+                while cap.isOpened() and frame_idx < total_frames:
                     ret, frame = cap.read()
                     if not ret:
                         break
@@ -264,7 +270,7 @@ elif menu == "🎥 Video Tracking":
                             cv2.putText(frame, f"ID {tid} | {label}", (x1, y1 - 6),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
 
-                            pts = track_history[tid][-15:]
+                            pts = track_history[tid][-12:]
                             for i in range(1, len(pts)):
                                 cv2.line(frame, pts[i - 1], pts[i], (0, 255, 0), 2)
 
@@ -277,12 +283,12 @@ elif menu == "🎥 Video Tracking":
                                     c_ba += 1
                                     counted_ids.add(tid)
 
-                    cv2.rectangle(frame, (8, 8), (360, 40), (0, 0, 0), -1)
+                    cv2.rectangle(frame, (8, 8), (340, 38), (0, 0, 0), -1)
                     cv2.putText(frame, f"Total: {c_ab+c_ba} (A->B:{c_ab}, B->A:{c_ba})",
-                                (14, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
+                                (14, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 255, 255), 2)
                     out.write(frame)
 
-                    if processed_frames % 5 == 0:
+                    if processed_frames % 3 == 0:
                         pct = min(int((frame_idx / total_frames) * 100), 99)
                         progress_bar.progress(pct)
                         status_text.info(f"🔄 Memproses frame {frame_idx}/{total_frames} ({pct}%) | Terhitung: {c_ab + c_ba} kendaraan...")
@@ -291,13 +297,13 @@ elif menu == "🎥 Video Tracking":
                 out.release()
                 fps_proc = round(processed_frames / max(time.time() - t0, 0.1), 2)
 
-                status_text.info("🎬 Mengonversi video agar siap diputar di browser...")
+                status_text.info("🎬 Menyiapkan pemutar video web...")
                 web_out = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
                 try:
                     import subprocess, imageio_ffmpeg
                     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
                     subprocess.run(
-                        [ffmpeg_exe, "-y", "-i", raw_out, "-vcodec", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", web_out],
+                        [ffmpeg_exe, "-y", "-i", raw_out, "-vcodec", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p", web_out],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
                     )
                     final_video_path = web_out
@@ -321,15 +327,22 @@ elif menu == "🎥 Video Tracking":
 
     with tab2:
         exp_dir = "results/experiment_videos"
-        if os.path.exists(exp_dir) and len(os.listdir(exp_dir)) > 0:
-            vid_files = sorted(os.listdir(exp_dir))
+        if os.path.exists(exp_dir) and len([f for f in os.listdir(exp_dir) if f.endswith(".mp4")]) > 0:
+            vid_files = sorted([f for f in os.listdir(exp_dir) if f.endswith(".mp4")])
             selected_vid = st.selectbox("Pilih Video Hasil Eksperimen:", vid_files)
             vid_path = os.path.join(exp_dir, selected_vid)
             st.video(vid_path)
             with open(vid_path, "rb") as f:
                 st.download_button(f"⬇️ Download {selected_vid}", f, file_name=selected_vid)
         else:
-            st.warning("Folder `results/experiment_videos` masih kosong. Jalankan `run_experiments.py` terlebih dahulu.")
+            st.info(
+                "ℹ️ **Catatan Server Online:** File video mentah E1–E10 (`.mp4`) berukuran besar sehingga "
+                "tidak disimpan di repositori GitHub. Anda dapat mengunggah video uji Anda sendiri pada tab "
+                "**📤 Upload & Proses Video Baru** di sebelah kiri, atau melihat rekapitulasi angka seluruh "
+                "10 eksperimen di bawah ini:"
+            )
+            if df_exp is not None:
+                st.dataframe(df_exp, use_container_width=True)
 
 # ==========================================
 # MENU 3: VEHICLE STATISTICS
