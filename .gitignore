@@ -1,0 +1,4 @@
+dataset/videos/*.mp4
+results/experiment_videos/*.mp4
+__pycache__/
+*.pyc

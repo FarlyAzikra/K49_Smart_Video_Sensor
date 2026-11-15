@@ -1,0 +1,11 @@
+Experiment_ID,Skenario,Video_File,Conf_Threshold,Line_Ratio,Tracker,Total_Counted_AI,Arah_A_to_B,Arah_B_to_A,Total_Unique_IDs,Avg_FPS,Inference_Time_ms,Ground_Truth_Manual,ID_Switch_Manual
+E1,Kondisi Normal (Baseline),video_normal.mp4,0.35,0.25,bytetrack.yaml,17,0,17,44,14.66,68.22,0,0
+E2,Confidence Threshold 0.30,video_normal.mp4,0.3,0.25,bytetrack.yaml,17,0,17,48,21.35,46.83,0,0
+E3,Confidence Threshold 0.50,video_normal.mp4,0.5,0.25,bytetrack.yaml,17,0,17,39,21.44,46.64,0,0
+E4,Confidence Threshold 0.70,video_normal.mp4,0.7,0.25,bytetrack.yaml,17,0,17,28,21.57,46.37,0,0
+E5,Sedikit Kendaraan (Sepi),video_sepi.mp4,0.35,0.4,bytetrack.yaml,10,0,10,25,20.99,47.64,0,0
+E6,Banyak Kendaraan (Padat),video_padat.mp4,0.35,0.5,bytetrack.yaml,35,8,27,130,20.38,49.07,0,0
+E7,Objek Saling Berdekatan,video_berdekatan.mp4,0.35,0.4,bytetrack.yaml,23,12,11,118,20.31,49.24,0,0
+E8,Occlusion Ringan,video_occlusion.mp4,0.35,0.4,bytetrack.yaml,23,22,1,121,20.16,49.59,0,0
+E9,Pergerakan Cepat,video_cepat.mp4,0.35,0.4,bytetrack.yaml,20,13,7,59,21.06,47.49,0,0
+E10,Pencahayaan Berbeda (Malam),video_cahaya.mp4,0.3,0.5,bytetrack.yaml,26,12,14,90,14.48,69.07,0,0
