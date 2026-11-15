@@ -79,6 +79,12 @@ menu = st.sidebar.radio(
     ]
 )
 
+ANGGOTA_KELOMPOK = [
+    {"nama": "Muhammad Farly Azikra", "nim": "2511500338", "peran": "Computer Vision & Detection"},
+    {"nama": "Muhammad Zakariyya",    "nim": "2511500387", "peran": "Tracking & Analytics"},
+    {"nama": "Ryan Babel Christian",  "nim": "2511501336", "peran": "Application & Research"},
+]
+
 st.sidebar.markdown("---")
 st.sidebar.info("**Kelompok K49**\n\nModel: YOLO11s + ByteTrack\n\nTarget: Smart Video Sensor")
 
@@ -87,6 +93,18 @@ st.sidebar.info("**Kelompok K49**\n\nModel: YOLO11s + ByteTrack\n\nTarget: Smart
 # ==========================================
 if menu == "🏠 Home":
     st.subheader("🏠 Konsep Dasar: Dari Kamera Biasa Menjadi Smart Video Sensor")
+    st.markdown("### 👥 Anggota Kelompok K49")
+    cols_team = st.columns(len(ANGGOTA_KELOMPOK))
+    for idx, anggota in enumerate(ANGGOTA_KELOMPOK):
+        with cols_team[idx]:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h4 style="margin:0 0 5px 0; color:#0D47A1;">{anggota['nama']}</h4>
+                <p style="margin:0; font-size:14px;"><b>NIM:</b> {anggota['nim']}</p>
+                <p style="margin:4px 0 0 0; font-size:13px; color:#475569;"><i>Peran: {anggota['peran']}</i></p>
+            </div>
+            """, unsafe_allow_html=True)
+    st.markdown("---")
     st.write(
         "Sistem ini mengembangkan kemampuan Computer Vision dari sekadar mendeteksi keberadaan objek "
         "menjadi sistem pelacakan pergerakan berkelanjutan antar-frame (*multi-object tracking*)."
