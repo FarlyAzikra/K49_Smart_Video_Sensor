@@ -43,7 +43,7 @@ st.markdown("""
 # Header Utama
 st.markdown("""
 <div class="main-header">
-    <h1>🎥 SMART VIDEO SENSOR DASHBOARD (K49)</h1>
+    <h1>K49 — Object Tracking dan Analisis Pergerakan Berbasis Computer Vision</h1>
     <p>Implementasi Object Detection, Object Tracking, Trajectory Analysis, & Vehicle Counting Berbasis Computer Vision</p>
 </div>
 """, unsafe_allow_html=True)
@@ -87,7 +87,7 @@ ANGGOTA_KELOMPOK = [
 ]
 
 st.sidebar.markdown("---")
-st.sidebar.info("**Kelompok K49**\n\nModel: YOLO11s + ByteTrack\n\nTarget: Smart Video Sensor")
+st.sidebar.info("**Kelompok K49**\n\nModel: YOLO11s + ByteTrack\n\nTarget: Smart Video Sensor Untuk Kendaraan")
 
 # ==========================================
 # MENU 1: HOME
