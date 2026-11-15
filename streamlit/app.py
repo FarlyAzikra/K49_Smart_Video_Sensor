@@ -1,4 +1,5 @@
 import os
+import gc
 import cv2
 import time
 import tempfile
@@ -56,6 +57,10 @@ def load_csv(path):
     if os.path.exists(path):
         return pd.read_csv(path)
     return None
+
+@st.cache_resource
+def load_yolo_model(model_path):
+    return YOLO(model_path)
 
 df_counting = load_csv("results/counting_results.csv")
 df_trajectory = load_csv("results/trajectory.csv")
@@ -144,25 +149,30 @@ elif menu == "🎥 Video Tracking":
 
     with tab1:
         st.write("Unggah file video lalu lintas (`.mp4`) untuk memutar preview video asli dan menjalankan tracking.")
-        col_set1, col_set2 = st.columns(2)
+        col_set1, col_set2, col_set3 = st.columns(3)
         with col_set1:
             conf_val = st.slider("Confidence Threshold", 0.15, 0.85, 0.35, 0.05)
         with col_set2:
-            line_pos = st.slider("Posisi Count Line (Rasio Tinggi Layar)", 0.15, 0.85, 0.40, 0.05)
+            line_pos = st.slider("Posisi Count Line (Rasio Tinggi)", 0.15, 0.85, 0.50, 0.05)
+        with col_set3:
+            speed_mode = st.selectbox(
+                "Mode Pemrosesan Server",
+                ["Cepat (Rekomendasi Cloud)", "Detail (Lokal / Laptop)"],
+                index=0
+            )
 
         uploaded_file = st.file_uploader("Pilih Video (.mp4 / .avi / .mov)", type=["mp4", "avi", "mov"])
 
         if uploaded_file is not None:
-            # Simpan sementara file yang diunggah
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-            tfile.write(uploaded_file.getvalue())
+            tfile.write(uploaded_file.getbuffer())
             tfile.flush()
+            tfile.close()
 
-            # TAMPILKAN PREVIEW VIDEO ASLI & SIMULASI GARIS SEBELUM DIPROSES
             col_vid1, col_vid2 = st.columns(2)
             with col_vid1:
                 st.markdown("**🎬 Preview Video Asli (Input)**")
-                st.video(uploaded_file.getvalue())
+                st.video(tfile.name)
 
             with col_vid2:
                 st.markdown(f"**📏 Simulasi Posisi Count Line ({line_pos:.2f})**")
@@ -180,89 +190,127 @@ elif menu == "🎥 Video Tracking":
             st.markdown("---")
 
             if st.button("▶️ Mulai Proses Tracking", type="primary"):
-                with st.spinner("Sedang memproses video frame-demi-frame... Mohon tunggu."):
-                    model_path = "model/detection_model.pt" if os.path.exists("model/detection_model.pt") else "yolo11s.pt"
-                    model = YOLO(model_path)
-                    vehicle_classes = {1: "motorcycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                status_text.info("⏳ Memuat model YOLO11s...")
 
-                    cap = cv2.VideoCapture(tfile.name)
-                    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    fps_in = cap.get(cv2.CAP_PROP_FPS) or 25.0
-                    line_y = int(height * line_pos)
+                model_path = "model/detection_model.pt" if os.path.exists("model/detection_model.pt") else "yolo11s.pt"
+                model = load_yolo_model(model_path)
+                vehicle_classes = {1: "motorcycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 
-                    raw_out = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-                    out = cv2.VideoWriter(raw_out, cv2.VideoWriter_fourcc(*"mp4v"), fps_in, (width, height))
+                # Pengaturan ringan untuk CPU Cloud vs Detail untuk Laptop
+                if speed_mode == "Cepat (Rekomendasi Cloud)":
+                    infer_size = 480
+                    frame_skip = 3
+                    target_w = 640
+                else:
+                    infer_size = 640
+                    frame_skip = 1
+                    target_w = 854
 
-                    track_history = defaultdict(list)
-                    counted_ids = set()
-                    c_ab, c_ba = 0, 0
-                    frames = 0
-                    t0 = time.time()
+                cap = cv2.VideoCapture(tfile.name)
+                orig_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                orig_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                fps_in = cap.get(cv2.CAP_PROP_FPS) or 25.0
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
 
-                    while cap.isOpened():
-                        ret, frame = cap.read()
-                        if not ret:
-                            break
-                        frames += 1
-                        results = model.track(frame, persist=True, conf=conf_val, imgsz=960,
-                                              classes=list(vehicle_classes.keys()), tracker="bytetrack.yaml", verbose=False)
+                scale = target_w / orig_w if orig_w > target_w else 1.0
+                width = int(orig_w * scale)
+                height = int(orig_h * scale)
+                fps_out = max(fps_in / frame_skip, 8.0)
+                line_y = int(height * line_pos)
 
-                        cv2.line(frame, (0, line_y), (width, line_y), (0, 255, 255), 3)
-                        if results[0].boxes is not None and results[0].boxes.id is not None:
-                            boxes = results[0].boxes.xyxy.cpu().numpy()
-                            tids = results[0].boxes.id.int().cpu().tolist()
-                            cids = results[0].boxes.cls.int().cpu().tolist()
+                raw_out = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+                out = cv2.VideoWriter(raw_out, cv2.VideoWriter_fourcc(*"mp4v"), fps_out, (width, height))
 
-                            for box, tid, cid in zip(boxes, tids, cids):
-                                x1, y1, x2, y2 = map(int, box)
-                                cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
-                                track_history[tid].append((cx, cy))
-                                label = vehicle_classes[cid]
+                track_history = defaultdict(list)
+                counted_ids = set()
+                c_ab, c_ba = 0, 0
+                frame_idx = 0
+                processed_frames = 0
+                t0 = time.time()
 
-                                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 144, 30), 2)
-                                cv2.putText(frame, f"ID {tid} | {label}", (x1, y1 - 8),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    frame_idx += 1
 
-                                pts = track_history[tid][-20:]
-                                for i in range(1, len(pts)):
-                                    cv2.line(frame, pts[i - 1], pts[i], (0, 255, 0), 2)
+                    if frame_idx % frame_skip != 0:
+                        continue
 
-                                if len(track_history[tid]) >= 2 and tid not in counted_ids:
-                                    py = track_history[tid][-2][1]
-                                    if py < line_y <= cy:
-                                        c_ab += 1
-                                        counted_ids.add(tid)
-                                    elif py > line_y >= cy:
-                                        c_ba += 1
-                                        counted_ids.add(tid)
+                    processed_frames += 1
+                    if scale != 1.0:
+                        frame = cv2.resize(frame, (width, height))
 
-                        cv2.rectangle(frame, (10, 10), (420, 48), (0, 0, 0), -1)
-                        cv2.putText(frame, f"Total: {c_ab+c_ba} (A->B:{c_ab}, B->A:{c_ba})",
-                                    (18, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
-                        out.write(frame)
+                    results = model.track(
+                        frame, persist=True, conf=conf_val, imgsz=infer_size,
+                        classes=list(vehicle_classes.keys()), tracker="bytetrack.yaml", verbose=False
+                    )
 
-                    cap.release()
-                    out.release()
-                    fps_proc = round(frames / (time.time() - t0), 2)
+                    cv2.line(frame, (0, line_y), (width, line_y), (0, 255, 255), 2)
+                    if results[0].boxes is not None and results[0].boxes.id is not None:
+                        boxes = results[0].boxes.xyxy.cpu().numpy()
+                        tids = results[0].boxes.id.int().cpu().tolist()
+                        cids = results[0].boxes.cls.int().cpu().tolist()
 
-                    # Konversi video hasil ke H.264 agar bisa diputar langsung di browser web
-                    web_out = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-                    try:
-                        import subprocess, imageio_ffmpeg
-                        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-                        subprocess.run(
-                            [ffmpeg_exe, "-y", "-i", raw_out, "-vcodec", "libx264", "-pix_fmt", "yuv420p", web_out],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
-                        )
-                        final_video_path = web_out
-                    except Exception:
-                        final_video_path = raw_out
+                        for box, tid, cid in zip(boxes, tids, cids):
+                            x1, y1, x2, y2 = map(int, box)
+                            cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
+                            track_history[tid].append((cx, cy))
+                            label = vehicle_classes[cid]
 
-                    st.session_state["last_video_path"] = final_video_path
-                    st.session_state["last_stats"] = (c_ab, c_ba, fps_proc)
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 144, 30), 2)
+                            cv2.putText(frame, f"ID {tid} | {label}", (x1, y1 - 6),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
 
-            # Tampilkan hasil jika sudah selesai diproses
+                            pts = track_history[tid][-15:]
+                            for i in range(1, len(pts)):
+                                cv2.line(frame, pts[i - 1], pts[i], (0, 255, 0), 2)
+
+                            if len(track_history[tid]) >= 2 and tid not in counted_ids:
+                                py = track_history[tid][-2][1]
+                                if py < line_y <= cy:
+                                    c_ab += 1
+                                    counted_ids.add(tid)
+                                elif py > line_y >= cy:
+                                    c_ba += 1
+                                    counted_ids.add(tid)
+
+                    cv2.rectangle(frame, (8, 8), (360, 40), (0, 0, 0), -1)
+                    cv2.putText(frame, f"Total: {c_ab+c_ba} (A->B:{c_ab}, B->A:{c_ba})",
+                                (14, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
+                    out.write(frame)
+
+                    if processed_frames % 5 == 0:
+                        pct = min(int((frame_idx / total_frames) * 100), 99)
+                        progress_bar.progress(pct)
+                        status_text.info(f"🔄 Memproses frame {frame_idx}/{total_frames} ({pct}%) | Terhitung: {c_ab + c_ba} kendaraan...")
+
+                cap.release()
+                out.release()
+                fps_proc = round(processed_frames / max(time.time() - t0, 0.1), 2)
+
+                status_text.info("🎬 Mengonversi video agar siap diputar di browser...")
+                web_out = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+                try:
+                    import subprocess, imageio_ffmpeg
+                    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+                    subprocess.run(
+                        [ffmpeg_exe, "-y", "-i", raw_out, "-vcodec", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", web_out],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+                    )
+                    final_video_path = web_out
+                except Exception:
+                    final_video_path = raw_out
+
+                progress_bar.progress(100)
+                status_text.empty()
+                gc.collect()
+
+                st.session_state["last_video_path"] = final_video_path
+                st.session_state["last_stats"] = (c_ab, c_ba, fps_proc)
+
             if "last_video_path" in st.session_state and os.path.exists(st.session_state["last_video_path"]):
                 c_ab, c_ba, fps_proc = st.session_state["last_stats"]
                 st.success(f"✅ Selesai! Total Terhitung: {c_ab + c_ba} kendaraan (A➔B: {c_ab}, B➔A: {c_ba}) | Kecepatan: {fps_proc} FPS")
