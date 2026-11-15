@@ -146,6 +146,16 @@ if menu == "🏠 Home":
 # ==========================================
 elif menu == "🎥 Video Tracking":
     st.subheader("🎥 Video Object Tracking & Line Crossing")
+    st.warning(
+        "⚠️ **Catatan Sumber Daya Server Cloud & Eksekusi Lokal (`run_experiments.py`):**\n\n"
+        "Server hosting gratis (**Streamlit Community Cloud**) memiliki keterbatasan kapasitas memori (**RAM 1 GB**) "
+        "dan hanya berjalan menggunakan **CPU tanpa akselerasi GPU**, sehingga pemrosesan *object tracking* video beresolusi "
+        "tinggi secara langsung di halaman web ini membutuhkan waktu sangat lama atau berpotensi terhenti akibat batas RAM.\n\n"
+        "Oleh karena itu, seluruh pemrosesan 10 skenario eksperimen (**E1–E10**) dijalankan secara lokal melalui skrip "
+        "**`run_experiments.py`** di VS Code menggunakan model **`YOLO11s + ByteTrack`**. Seluruh data metrik "
+        "(*counting*, *trajectory*, dan *performance*) yang ditampilkan pada menu-menu di dashboard ini merupakan hasil "
+        "aktual yang telah diproses dan diekspor dari eksekusi lokal tersebut."
+    )
     tab1, tab2 = st.tabs(["📤 Upload & Proses Video Baru", "🎬 Putar Hasil Eksperimen (E1–E10)"])
 
     with tab1:
