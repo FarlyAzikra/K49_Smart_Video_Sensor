@@ -11,9 +11,8 @@ import streamlit as st
 from collections import defaultdict
 from ultralytics import YOLO
 
-# ==========================================
-# 1. KONFIGURASI HALAMAN & TEMA BIRU MODERN
-# ==========================================
+#1. Halaman
+
 st.set_page_config(
     page_title="Smart Video Sensor Dashboard - K49",
     page_icon="🎥",
@@ -50,9 +49,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 2. FUNGSI PEMUAT DATA CSV
-# ==========================================
+
+#2. fungsi file csv
+
 @st.cache_data
 def load_csv(path):
     if os.path.exists(path):
@@ -68,9 +67,9 @@ df_trajectory = load_csv("results/trajectory.csv")
 df_tracking = load_csv("results/tracking_results.csv")
 df_exp = load_csv("results/experiment_results.csv")
 
-# ==========================================
-# 3. SIDEBAR NAVIGASI (7 MENU WAJIB K49)
-# ==========================================
+
+#3. Sidebar (7 menu)
+
 st.sidebar.image("https://img.icons8.com/fluency/96/video-stabilization.png", width=64)
 st.sidebar.title("Navigasi Sistem")
 menu = st.sidebar.radio(
@@ -95,9 +94,9 @@ ANGGOTA_KELOMPOK = [
 st.sidebar.markdown("---")
 st.sidebar.info("**Kelompok K49**\n\nModel: YOLO11s + ByteTrack\n\nTarget: Smart Video Sensor Untuk Kendaraan")
 
-# ==========================================
-# MENU 1: HOME
-# ==========================================
+
+# Menu 1: Home
+
 if menu == "🏠 Home":
     st.subheader("🏠 Konsep Dasar: Dari Kamera Biasa Menjadi Smart Video Sensor")
     st.markdown("### 👥 Anggota Kelompok K49")
@@ -141,9 +140,9 @@ if menu == "🏠 Home":
     - **Evaluasi 10 Skenario:** Menguji ketahanan model pada variasi *confidence threshold*, kepadatan lalu lintas, kecepatan, hingga pencahayaan malam.
     """)
 
-# ==========================================
-# MENU 2: VIDEO TRACKING (UPLOAD & LIVE DEMO)
-# ==========================================
+
+# Menu 2: Video Tracking
+
 elif menu == "🎥 Video Tracking":
     st.subheader("🎥 Video Object Tracking & Line Crossing")
     st.warning(
@@ -204,14 +203,13 @@ elif menu == "🎥 Video Tracking":
                 progress_bar = st.progress(0)
                 status_text = st.empty()
 
-                # Gunakan yolo11n.pt pada mode Hemat RAM agar tidak melebihi batas 1GB Streamlit Cloud
                 if speed_mode == "Hemat RAM (Cloud Gratis)":
                     status_text.info("⏳ Memuat model ringan YOLO11n (optimasi server cloud)...")
                     model = load_yolo_model("yolo11n.pt")
                     infer_size = 320
                     frame_skip = 4
                     target_w = 480
-                    max_frames_limit = 240  # Maksimal ~8-10 detik video agar bebas OOM
+                    max_frames_limit = 240
                 else:
                     status_text.info("⏳ Memuat model YOLO11s (mode lokal)...")
                     model_path = "model/detection_model.pt" if os.path.exists("model/detection_model.pt") else "yolo11s.pt"
@@ -354,9 +352,9 @@ elif menu == "🎥 Video Tracking":
             if df_exp is not None:
                 st.dataframe(df_exp, use_container_width=True)
 
-# ==========================================
-# MENU 3: VEHICLE STATISTICS
-# ==========================================
+
+# Menu 3: Vehicle Statistics
+
 elif menu == "📊 Vehicle Statistics":
     st.subheader("📊 Statistik Kendaraan & Distribusi Arah (Baseline E1)")
     if df_counting is not None:
@@ -389,9 +387,9 @@ elif menu == "📊 Vehicle Statistics":
     else:
         st.warning("Data `results/counting_results.csv` belum ditemukan.")
 
-# ==========================================
-# MENU 4: TRAJECTORY
-# ==========================================
+
+# Menu 4: Trajectory
+
 elif menu == "🗺️ Trajectory":
     st.subheader("🗺️ Analisis Lintasan Pergerakan Objek (Trajectory)")
     if df_trajectory is not None and not df_trajectory.empty:
@@ -413,7 +411,7 @@ elif menu == "🗺️ Trajectory":
             title="Peta Koordinat Lintasan Objek (Center Point Trajectory)",
             labels={"center_x": "Koordinat X (Piksel Horizontal)", "center_y": "Koordinat Y (Piksel Vertikal)", "track_id": "ID Objek"}
         )
-        # Balik sumbu Y agar sesuai dengan koordinat gambar/video (0,0 di pojok kiri atas)
+
         fig_traj.update_yaxes(autorange="reversed")
         st.plotly_chart(fig_traj, use_container_width=True)
 
@@ -422,9 +420,9 @@ elif menu == "🗺️ Trajectory":
     else:
         st.warning("Data `results/trajectory.csv` belum ditemukan.")
 
-# ==========================================
-# MENU 5: TRACKING ERROR
-# ==========================================
+
+# Menu 5: Tracking Error
+
 elif menu == "⚠️ Tracking Error":
     st.subheader("⚠️ Analisis Kesalahan Deteksi & Tracking (Error Analysis)")
     st.write("Dokumentasi kelemahan sistem pada berbagai kondisi lapangan untuk menjawab RQ1–RQ4.")
@@ -448,9 +446,9 @@ elif menu == "⚠️ Tracking Error":
     else:
         st.info("Tip: Simpan screenshot hasil tracking yang menunjukkan error ke folder `results/error_samples/` agar otomatis muncul di sini.")
 
-# ==========================================
-# MENU 6: PERFORMANCE
-# ==========================================
+
+# Menu 6: Performance
+
 elif menu == "📈 Performance":
     st.subheader("📈 Evaluasi Performa & Hasil 10 Eksperimen (E1–E10)")
     if df_exp is not None and not df_exp.empty:
@@ -475,9 +473,9 @@ elif menu == "📈 Performance":
     else:
         st.warning("Data `results/experiment_results.csv` belum ditemukan.")
 
-# ==========================================
-# MENU 7: AI ETHICS
-# ==========================================
+
+# Menu 7: AI Ethics
+
 elif menu == "⚖️ AI Ethics":
     st.subheader("⚖️ Etika Kecerdasan Buatan (AI Ethics) & 9 Nilai Kebudiluhuran")
 
