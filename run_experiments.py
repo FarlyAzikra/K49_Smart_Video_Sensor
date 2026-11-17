@@ -7,16 +7,10 @@ import pandas as pd
 from collections import defaultdict
 from ultralytics import YOLO
 
-# ==========================================
-# 1. CEK DEVICE (OTOMATIS PILIH GPU JIKA ADA)
-# ==========================================
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
 device_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
 print(f"🖥️ Perangkat Komputasi Aktif: {device_name} (device={DEVICE})")
 
-# ==========================================
-# 2. STRUKTUR FOLDER & DAFTAR EKSPERIMEN
-# ==========================================
 folders = ["dataset/videos", "model", "tracking", "results/experiment_videos", "streamlit"]
 for f in folders:
     os.makedirs(f, exist_ok=True)
@@ -38,7 +32,7 @@ experiments = [
 ]
 
 VEHICLE_CLASSES = {1: "motorcycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
-MODEL_NAME = "yolo11s.pt"  # Lebih akurat daripada yolov8n.pt
+MODEL_NAME = "yolo11s.pt" 
 
 base_model = YOLO(MODEL_NAME)
 if os.path.exists(MODEL_NAME):
@@ -47,11 +41,7 @@ if os.path.exists(MODEL_NAME):
 with open("tracking/tracker_config.yaml", "w") as f:
     f.write("tracker_type: bytetrack\ntrack_high_thresh: 0.5\ntrack_low_thresh: 0.1\nnew_track_thresh: 0.6\ntrack_buffer: 30\nmatch_thresh: 0.8\n")
 
-# ==========================================
-# 3. PREPROCESSING KHUSUS VIDEO MALAM (CLAHE)
-# ==========================================
 def enhance_low_light(frame):
-    # Meningkatkan kontras pencahayaan tanpa merusak warna asli objek
     lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
     clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
@@ -59,9 +49,6 @@ def enhance_low_light(frame):
     enhanced_lab = cv2.merge((cl, a, b))
     return cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
 
-# ==========================================
-# 4. FUNGSI PEMROSESAN VIDEO
-# ==========================================
 def run_single_experiment(exp):
     video_path = os.path.join(VIDEO_DIR, exp["video"])
     if not os.path.exists(video_path):
@@ -101,7 +88,6 @@ def run_single_experiment(exp):
             break
         frame_count += 1
 
-        # Terapkan peningkatan kontras khusus untuk skenario E10 (video malam)
         process_frame = enhance_low_light(frame) if is_night_video else frame
 
         results = exp_model.track(
@@ -115,7 +101,6 @@ def run_single_experiment(exp):
             verbose=False
         )
 
-        # Gambar pada process_frame agar hasil pencerahan malam juga terlihat di video output
         display_frame = process_frame.copy()
         cv2.line(display_frame, (0, line_y), (width, line_y), (0, 255, 255), 3)
         cv2.putText(display_frame, f"COUNT LINE ({exp['line_ratio']})", (10, line_y - 10),
@@ -202,9 +187,6 @@ def run_single_experiment(exp):
         "ID_Switch_Manual": 0
     }
 
-# ==========================================
-# 5. EKSEKUSI
-# ==========================================
 all_results = []
 for exp in experiments:
     res = run_single_experiment(exp)
